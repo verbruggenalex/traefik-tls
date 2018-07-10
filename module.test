@@ -1,0 +1,7 @@
+<?php
+
+$variable = test;
+
+function test() {
+  test;
+}
