@@ -1,0 +1,80 @@
+version: '3'
+networks:
+  proxy:
+    external: true
+services:
+  web:
+    image: feature/php71-dev-7
+    environment:
+      - XDEBUG_CONFIG="idekey=cloud9ide remote_host=cloud9 remote_connect_back=0"
+      - COMPOSER_CACHE_DIR=/composer/cache
+    working_dir: ${PWD}
+    volumes:
+      - ${PWD}:${PWD}
+      - ~/.ssh:/root/.ssh/
+      - ~/.composer:/composer
+    deploy:
+      labels:
+        - 'traefik.c9.backend=cloud9'
+        - 'traefik.c9.port=8081'
+        - 'traefik.c9.frontend.rule=Host:cloud9.domain.local'
+        - 'traefik.web.backend=web'
+        - 'traefik.web.port=8080'
+        - 'traefik.web.frontend.rule=Host:web.domain.local'
+        - 'traefik.frontend.auth.basic=root:$$apr1$$maTXzIMX$$YXkPh8TX5lm2dpFGb6GrQ.'
+        - 'traefik.docker.network=proxy'
+        - 'traefik.enable=true'
+    networks:
+      - proxy
+  mail:
+    image: tophfr/mailcatcher
+    deploy:
+      replicas: 1
+      labels:
+        - 'traefik.smtp.backend=mail'
+        - 'traefik.smtp.port=25'
+        - 'traefik.catch.port=80'
+        - 'traefik.frontend.rule=PathPrefixStrip:/mail'
+#        - 'traefik.catch.frontend.rule=Host:mailcatcher.${PROJECT_BASE_URL:-domain.local}'
+        - 'traefik.catch.frontend.auth.basic=root:$$apr1$$maTXzIMX$$YXkPh8TX5lm2dpFGb6GrQ.'
+        - 'traefik.docker.network=proxy'
+        - 'traefik.enable=true'
+    networks:
+      - proxy      
+  mysql:
+    image: mysql:5.7
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-drupal}
+      - MYSQL_USER=${MYSQL_USER:-user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-password}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}
+    deploy:
+      labels:
+        - 'traefik.backend=mysql'
+        - 'traefik.port=3306'
+        - 'traefik.docker.network=proxy'
+        - 'traefik.enable=true'
+    networks:
+      - proxy
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_PORT: 3306
+      PMA_HOST: mysql
+      PMA_USER: ${MYSQL_USER:-root}
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+#      PMA_ABSOLUTE_URI: 'https://phpmyadmin.${PROJECT_BASE_URL:-domain.local}'
+      PHP_UPLOAD_MAX_FILESIZE: 1G
+      PHP_MAX_INPUT_VARS: 1G
+    deploy:
+      labels:
+        - 'traefik.backend=phpmyadmin'
+        - 'traefik.frontend.rule=PathPrefixStrip:/phpmyadmin'
+#        - 'traefik.frontend.rule=Host:phpmyadmin.${PROJECT_BASE_URL:-domain.local}'
+        - 'traefik.frontend.auth.basic=root:$$apr1$$maTXzIMX$$YXkPh8TX5lm2dpFGb6GrQ.'
+        - 'traefik.backend=solr'
+        - 'traefik.port=80'
+        - 'traefik.docker.network=proxy'
+        - 'traefik.enable=true'
+    networks:
+      - proxy

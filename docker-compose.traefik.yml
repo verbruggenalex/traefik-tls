@@ -7,7 +7,7 @@ networks:
 
 configs:
   traefik_toml_v2:
-    file: ./traefik.toml
+    file: ./traefik-custom.toml
   nginx_conf:
     file: ./nginx-redirect.conf
 
@@ -19,12 +19,18 @@ secrets:
 
 services:
   traefik:
-    image: traefik:1.4
+    image: traefik:1.6-alpine
     deploy:
-      replicas: 2
       placement:
         constraints:
         - node.role == manager
+      labels:
+      - "traefik.port=8080"
+      - "traefik.docker.network=proxy"
+      - "traefik.frontend.rule=Host:traefik.domain.local"
+      - "traefik.backend=traefik"
+      - "traefik.frontend.entryPoints=http,https"
+      - "traefik.enable=true"
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -56,11 +62,10 @@ services:
       uid: "0"
       mode: 400
   nginx_redirect:
-    image: nginx:1.13
+    image: nginx:latest
     networks:
     - proxy
     deploy:
-      replicas: 2
       labels:
       - traefik.frontend.entryPoints=http
       - traefik.frontend.rule=PathPrefix:/
